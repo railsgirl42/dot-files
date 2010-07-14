@@ -1,0 +1,49 @@
+module Autotest::Growl
+  Autotest.add_hook :run_command do
+    @label = File.basename(Dir.pwd).upcase
+    @run_scenarios = false
+  end
+#
+  def self.growl title, msg, img, pri=0, stick=""
+     system "notify-send --icon #{img} '#{title}'  '#{msg.inspect}'"
+  end
+#
+  Autotest.add_hook :ran_command do |autotest|
+    gist = autotest.results.grep(/\d+\s+(example|test)s?/).map {|s| s.gsub(/(\e.*?m|\n)/, '') }.join(" / ")
+    if gist == ''
+      growl("#{@label} cannot run tests", '', "~/.autotest_images/ruby_grey.png")
+    else
+      if gist.match(/[1-9]\d*\s+(failure|error)/)
+        growl("#{@label} fails some tests", "#{gist}", "~/.autotest_images/ruby_red.png")
+      elsif gist.match(/pending/)
+        growl("#{@label} has pending tests", "#{gist}", "~/.autotest_images/ruby_yellow.png")
+        @run_scenarios = true
+      else
+        growl("#{@label} passes all tests", "#{gist}", "~/.autotest_images/ruby_green.png")
+        @run_scenarios = true
+      end
+    end
+  end
+#
+  # FIXME: This is a temporary workaround until Cucumber is properly integrated!
+  Autotest.add_hook :waiting do |autotest|
+    if @run_scenarios
+      gist = autotest.results.grep(/\d+\s+(scenario|step)s?/).map {|s| s.gsub(/(\e.*?m|\n)/, '') }.join(" / ")
+      if gist == ''
+        growl("#{@label} cannot run scenarios", '', "~/.autotest_images/ruby_grey.png")
+      else
+        if gist.match(/failed/)
+          growl("#{@label} fails some scenarios", "#{gist}", "~/.autotest_images/ruby_red.png")
+        elsif gist.match(/undefined/)
+          growl("#{@label} has undefined scenarios", "#{gist}", "~/.autotest_images/ruby_yellow.png")
+        else
+          growl("#{@label} passes all scenarios", "#{gist}", "~/.autotest_images/ruby_green.png")
+        end
+      end
+   end
+  end
+end
+#
+Autotest.add_hook :initialize do |autotest|
+  %w{.hg .git vendor webrat*.html}.each {|exception| autotest.add_exception(exception) }
+end
